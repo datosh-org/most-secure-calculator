@@ -1,0 +1,274 @@
+name: calculator
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  GO_VERSION: "1.19.3"
+  SYFT_VERSION: "0.62.1"
+  GRYPE_VERSION: "0.53.1"
+  SLSA_VERIFIER_VERSION: "2.0.0"
+  IMAGE_REF: "ghcr.io/${{ github.repository }}/calculator"
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+      - name: Setup Go
+        uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f # v3.3.1
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Install go-junit-report
+        run: go install github.com/jstemmer/go-junit-report/v2@v2.0.0
+      - name: Run Unit Tests
+        run: go test -v 2>&1 ./... | go-junit-report -set-exit-code > report.xml
+      - name: Test Report
+        uses: dorny/test-reporter@c9b3d0e2bd2a4e96aaf424dbaa31c46b42318226 # v1.6.0
+        if: always()
+        with:
+          name: 📋 Unit test report
+          path: report.xml
+          reporter: java-junit
+
+  build-calculator:
+    runs-on: ubuntu-22.04
+    outputs:
+      calculator-hash: ${{ steps.calculator-hash.outputs.calculator-hash }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+      - name: Setup Go
+        uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f # v3.3.1
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Build Calculator
+        run: |
+          CGO_ENABLED=0 go build \
+            -o calculator \
+            -trimpath -buildvcs=false -ldflags "-s -w -buildid=''" \
+            ./cmd/calculator-cli
+      - uses: actions/upload-artifact@83fd05a356d7e2593de66fc9913b3002723633cb # v3.1.1
+        with:
+          name: calculator
+          path: calculator
+      - name: Compute calculator hash
+        id: calculator-hash
+        run: |
+          CALCULATOR_HASH=$(sha256sum calculator | base64 -w0)
+          echo calculator-hash=${CALCULATOR_HASH} >> $GITHUB_OUTPUT
+
+  sign-calculator:
+    runs-on: ubuntu-22.04
+    permissions:
+      id-token: write
+    needs:
+      - build-calculator
+    steps:
+      - name: Install Cosign & Rekor CLI
+        uses: sigstore/cosign-installer@9becc617647dfa20ae7b1151972e9b3a2c338a2b # v2.8.1
+      - name: Download calculator binary
+        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        with:
+          name: calculator
+      - name: Sign calculator
+        run: |
+          cosign sign-blob calculator --output-certificate calculator.pem --output-signature calculator.sig
+          # Verify - as documentation & sanity check
+          cosign verify-blob calculator --cert calculator.pem --signature calculator.sig
+        env:
+          COSIGN_EXPERIMENTAL: 1
+      - uses: actions/upload-artifact@83fd05a356d7e2593de66fc9913b3002723633cb # v3.1.1
+        with:
+          name: calculator.pem
+          path: calculator.pem
+      - uses: actions/upload-artifact@83fd05a356d7e2593de66fc9913b3002723633cb # v3.1.1
+        with:
+          name: calculator.sig
+          path: calculator.sig
+
+  build-calculator-image:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+    needs:
+      - build-calculator
+    outputs:
+      digest: ${{ steps.build-container-image.outputs.Digest }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@57396166ad8aefe6098280995947635806a0e6ea # v4.1.1
+        with:
+          images: |
+            ${{ env.IMAGE_REF }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=
+            type=sha,format=long,prefix=
+            type=semver,pattern={{version}}
+            type=semver,pattern=v{{version}}
+            type=ref,event=branch
+      - name: Log in to ghcr.io
+        id: docker-login
+        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a # v2.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download calculator binary
+        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        with:
+          name: calculator
+      - name: Build and push container image
+        id: build-container-image
+        uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5 # v3.2.0
+        with:
+          context: .
+          file: cmd/calculator-cli/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+
+  sign-calculator-image:
+    runs-on: ubuntu-22.04
+    needs:
+      - build-calculator-image
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+      - name: Install Cosign CLI
+        uses: sigstore/cosign-installer@9becc617647dfa20ae7b1151972e9b3a2c338a2b # v2.8.1
+      - name: Log in to ghcr.io
+        id: docker-login
+        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a # v2.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Sign calculator-image
+        run: |
+          cosign sign -f ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }}
+          cosign verify ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }}
+        env:
+          COSIGN_EXPERIMENTAL: 1
+
+  sbom-image:
+    runs-on: ubuntu-22.04
+    needs:
+      - build-calculator-image
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Log in to ghcr.io
+        id: docker-login
+        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a # v2.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Cosign CLI
+        uses: sigstore/cosign-installer@9becc617647dfa20ae7b1151972e9b3a2c338a2b # v2.8.1
+      # SBOM signing is not yet supported in: https://github.com/anchore/sbom-action/issues/153
+      # We need to download syft and run commands directly
+      - name: Download syft & grype
+        run: |
+          # Syft
+          curl -LO https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz
+          tar -xzf syft_${SYFT_VERSION}_linux_amd64.tar.gz
+          install syft /usr/local/bin
+          syft version
+          # Grype
+          curl -LO https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_linux_amd64.tar.gz
+          tar -xzf grype_${GRYPE_VERSION}_linux_amd64.tar.gz
+          install grype /usr/local/bin
+          grype version
+      - name: Generate and sign SBOM
+        run: |
+          syft attest ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }} -o cyclonedx-json > calculator.att.json
+      - name: Check for known vulnerabilities
+        run: |
+          grype ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }} --fail-on critical --only-fixed
+
+  provenance:
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+    needs:
+      - build-calculator
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.4.0
+    with:
+      base64-subjects: "${{ needs.build-calculator.outputs.calculator-hash }}"
+
+  provenance-verify:
+    runs-on: ubuntu-22.04
+    needs:
+      - build-calculator
+      - provenance
+    steps:
+      - name: Download calculator binary
+        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        with:
+          name: calculator
+      - name: Download provenance
+        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        with:
+          name: ${{ needs.provenance.outputs.provenance-name }}
+      - name: Install slsa-verifier
+        run: |
+          curl -LO https://github.com/slsa-framework/slsa-verifier/releases/download/v${{ env.SLSA_VERIFIER_VERSION }}/slsa-verifier-linux-amd64
+          install slsa-verifier-linux-amd64 /usr/local/bin/slsa-verifier
+      - name: Verify provenance
+        run: |
+          slsa-verifier verify-artifact calculator \
+            --provenance-path calculator.intoto.jsonl \
+            --source-uri github.com/datosh-org/most-secure-calculator
+
+  release:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    needs:
+      - build-calculator
+      - sign-calculator
+      - unit-tests
+      - provenance
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download calculator binary
+        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        with:
+          name: calculator
+      - name: Download calculator certificate
+        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        with:
+          name: calculator.pem
+      - name: Download calculator signature
+        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        with:
+          name: calculator.sig
+      - name: Download provenance
+        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        with:
+          name: ${{ needs.provenance.outputs.provenance-name }}
+      - name: Release
+        uses: ncipollo/release-action@18eadf9c9b0f226f47f164f5373c6a44f0aae169 # v1.11.2
+        with:
+          draft: true
+          artifacts: "calculator,calculator.pem,calculator.sig,calculator.intoto.jsonl"
