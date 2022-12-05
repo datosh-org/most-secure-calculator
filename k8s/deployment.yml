@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: calculator
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: calculator
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: calculator
+    spec:
+      containers:
+        - name: calculator
+          imagePullPolicy: IfNotPresent
+          image: ko://github.com/datosh-org/most-secure-calculator/cmd/calculator-svc
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            limits:
+              cpu: '500m'
+              memory: '500Mi'
+            requests:
+              cpu: '500m'
+              memory: '500Mi'
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: calculator
+  namespace: default
+spec:
+  selector:
+    app: calculator
+  ports:
+  - port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+  name: ingress
+  namespace: default
+spec:
+  rules:
+  - http:
+      paths:
+      - pathType: Prefix
+        path: /calculator(/|$)(.*)
+        backend:
+          service:
+            name: calculator
+            port:
+              number: 8080
