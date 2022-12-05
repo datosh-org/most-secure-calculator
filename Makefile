@@ -26,7 +26,9 @@ build-cli:
 	@CGO_ENABLED=0 go build -o calculator -buildvcs=false -ldflags "-buildid=''" ./cmd/calculator-cli/
 
 build-svc:
-	@KO_DOCKER_REPO=${CONTAINER_REPO}/calculator-svc ko build ./cmd/calculator-svc/
+	@KO_DOCKER_REPO=${CONTAINER_REPO}/calculator-svc ko build ./cmd/calculator-svc/ --image-refs=to-be-signed.txt
+	@COSIGN_EXPERIMENTAL=1 cosign sign $$(cat to-be-signed.txt)
+	@rm to-be-signed.txt
 
 deploy:
 	@KO_DOCKER_REPO=kind.local ko apply -f k8s/deployment.yml
