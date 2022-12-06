@@ -1,0 +1,8 @@
+spec:
+  authorities:
+    - keyless:
+        identities:
+          - issuer: https://github.com/login/oauth
+          - subjectRegExp: .datosh18@gmail.com$
+    - key:
+        kms: https://github.com/web-flow.gpg
