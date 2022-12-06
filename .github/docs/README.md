@@ -3,7 +3,7 @@
 ## Release
 
 GitHub does **not** maintain an action to interact with releases. Both related
-action are archived:
+actions are archived:
 + [actions/upload-release-asset](https://github.com/actions/upload-release-asset)
 + [actions/create-release](https://github.com/actions/create-release)
 

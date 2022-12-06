@@ -15,6 +15,8 @@ kind-create:
 
 kind-deploy-nginx:
 	@kubectl apply -f kind/nginx.yml
+	@sleep 30
+	@kubectl -n ingress-nginx delete pods -l app.kubernetes.io/component=controller
 	@kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=120s
 
 kind-down:
