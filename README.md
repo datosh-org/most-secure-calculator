@@ -1,12 +1,12 @@
 # Most Secure Calculator
 
-This repository demonstrates how security best practices for a Go repository
+This repository demonstrates how security best practices for a Go CLI & backend service
 can be implemented using GitHub Actions.
 
 It features:
 * Git commit signing using [gitsign](https://github.com/sigstore/gitsign).
 * Git commit verification using [chaingurad/enforce](https://github.com/apps/chainguard-enforce).
-* SLSA provenance generation using [slsa-framework/slsa-github-generator](https://github.com/slsa-framework/slsa-github-generator).
+* SLSA level 3+ provenance generation using [slsa-framework/slsa-github-generator](https://github.com/slsa-framework/slsa-github-generator).
 * SLSA provenance verification using [slsa-framework/slsa-verifier](https://github.com/slsa-framework/slsa-verifier).
 
 * Unit test execution and test report generation using [jstemmer/go-junit-report](github.com/jstemmer/go-junit-report) and [dorny/test-reporter](https://github.com/dorny/test-reporter)
