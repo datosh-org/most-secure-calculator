@@ -1,6 +1,7 @@
 package someaction
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,4 +28,15 @@ func TestAdd(t *testing.T) {
 			}
 		})
 	}
+}
+
+func FuzzAdd(f *testing.F) {
+	for i := 0; i < 3; i++ {
+		f.Add(rand.Int(), rand.Int())
+	}
+
+	f.Fuzz(func(t *testing.T, a int, b int) {
+		sum := Add(a, b)
+		assert.Equal(t, a+b, sum)
+	})
 }
