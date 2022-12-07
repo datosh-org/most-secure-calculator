@@ -1,0 +1,37 @@
+name: Install Syft and Grype
+description: "Install tools for generating SBOMs and checking them for vulnerabilities."
+
+inputs:
+  syftVersion:
+    description: "Syft version to be installed"
+    required: true
+  grypeVersion:
+    description: "Grype version to be installed"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Syft
+      run: |
+        cd /tmp
+        curl -LO https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz
+        tar -xzf syft_${SYFT_VERSION}_linux_amd64.tar.gz
+        install syft /usr/local/bin
+        rm syft_${SYFT_VERSION}_linux_amd64.tar.gz
+        syft version
+      shell: bash
+      env:
+        SYFT_VERSION: ${{ inputs.syftVersion }}
+
+    - name: Install Grype
+      run: |
+        cd /tmp
+        curl -LO https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_linux_amd64.tar.gz
+        tar -xzf grype_${GRYPE_VERSION}_linux_amd64.tar.gz
+        install grype /usr/local/bin
+        rm grype_${GRYPE_VERSION}_linux_amd64.tar.gz
+        grype version
+      shell: bash
+      env:
+        GRYPE_VERSION: ${{ inputs.grypeVersion }}
