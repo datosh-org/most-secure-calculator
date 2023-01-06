@@ -50,7 +50,7 @@ jobs:
       - name: Build Calculator
         run: |
           make build-cli
-      - uses: actions/upload-artifact@83fd05a356d7e2593de66fc9913b3002723633cb # v3.1.1
+      - uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         with:
           name: calculator
           path: calculator
@@ -80,11 +80,11 @@ jobs:
           cosign verify-blob calculator --cert calculator.pem --signature calculator.sig
         env:
           COSIGN_EXPERIMENTAL: 1
-      - uses: actions/upload-artifact@83fd05a356d7e2593de66fc9913b3002723633cb # v3.1.1
+      - uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         with:
           name: calculator.pem
           path: calculator.pem
-      - uses: actions/upload-artifact@83fd05a356d7e2593de66fc9913b3002723633cb # v3.1.1
+      - uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         with:
           name: calculator.sig
           path: calculator.sig
