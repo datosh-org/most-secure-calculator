@@ -1,4 +1,4 @@
 # gcr.io/distroless/static includes certificates necessary for TLS.
-FROM gcr.io/distroless/static@sha256:ebd8cc37d22551dce0957ba8e58f03b22a8448bbf844c8c9ded4feef883b36bc as release
+FROM gcr.io/distroless/static@sha256:ea2ed73931ecd5d70f0bf3fdaa481c84f556cc205d6ceec78dff335fc4a313b2 as release
 COPY calculator /
 ENTRYPOINT [ "/calculator" ]
