@@ -254,7 +254,7 @@ jobs:
         with:
           name: ${{ needs.provenance.outputs.provenance-name }}
       - name: Release
-        uses: ncipollo/release-action@18eadf9c9b0f226f47f164f5373c6a44f0aae169 # v1.11.2
+        uses: ncipollo/release-action@6c75be85e571768fa31b40abf38de58ba0397db5 # v1.13.0
         with:
           draft: true
           artifacts: "calculator,calculator.pem,calculator.sig,calculator.intoto.jsonl"
