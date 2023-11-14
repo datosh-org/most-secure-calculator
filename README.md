@@ -18,29 +18,64 @@ It features:
 
 Download and install [sigstore/gitsign](https://github.com/sigstore/gitsign).
 
+<details>
+  <summary>Installation script</summary>
+
+  ```sh
+  VERSION=0.8.0
+  cd $(mktemp -d)
+  curl -LO https://github.com/sigstore/gitsign/releases/download/v${VERSION}/gitsign_${VERSION}_linux_amd64
+  curl -LO https://github.com/sigstore/gitsign/releases/download/v${VERSION}/gitsign-credential-cache_${VERSION}_linux_amd64
+  sudo install gitsign_${VERSION}_linux_amd64 /usr/local/bin/gitsign
+  sudo install gitsign-credential-cache_${VERSION}_linux_amd64 /usr/local/bin/gitsign-credential-cache
+  cd -
+  ```
+</details>
+
 Configure git to sign using `gitsign`.
 
 ```sh
-git config --global commit.gpgsign true  # Sign all commits
-git config --global tag.gpgsign true  # Sign all tags
-git config --global gpg.x509.program gitsign  # Use gitsign for signing
-git config --global gpg.format x509  # gitsign expects x509 args
+git config commit.gpgsign true  # Sign all commits
+git config tag.gpgsign true  # Sign all tags
+git config gpg.x509.program gitsign  # Use gitsign for signing
+git config gpg.format x509  # gitsign expects x509 args
 ```
 
 Optionally:
 ```sh
-# Static port for OIDC callback
-git config --global gitsign.redirecturl=http://localhost:39807/auth/callback
-# Pre-select GitHub as OIDC provider
-git config --global gitsign.connectorid=https://github.com/login/oauth
+# Static port for OIDC callback. This is helpful when you need to whitelist
+# or proxy the callback, e.g., when working with remote dev environments.
+git config gitsign.redirecturl http://localhost:39807/auth/callback
+# Pre-select GitHub as default OIDC provider.
+git config gitsign.connectorid https://github.com/login/oauth
 ```
+
+> [!NOTE]
+> Add `--global` to previous `git config` commands, so they apply for all repositories.
 
 Verify & inspect:
 
 ```sh
+# Using git,
 git verify-commit HEAD
+# Using gitsign
+gitsign verify --certificate-identity=datosh18@gmail.com --certificate-oidc-issuer=https://github.com/login/oauth
+
 git log --pretty=raw
 ```
+
+<details>
+  <summary>Helpful debug commands</summary>
+
+  ```sh
+  # Check your git config
+  git config --list --show-origin --show-scope
+  # Remove a config paramter
+  git config --unset gitsign.connectorid
+  # Parse git signature
+  git cat-file commit HEAD | sed -n '/-BEGIN/, /-END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
+  ```
+</details>
 
 ## Ko & KinD
 
