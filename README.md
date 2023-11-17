@@ -48,6 +48,8 @@ Optionally:
 git config gitsign.redirecturl http://localhost:39807/auth/callback
 # Pre-select GitHub as default OIDC provider.
 git config gitsign.connectorid https://github.com/login/oauth
+# Force unsigned and empty commit
+git commit --allow-empty --no-gpg-sign -m "nothing, unsigned"
 ```
 
 > [!NOTE]
