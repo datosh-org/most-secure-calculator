@@ -7,8 +7,8 @@ on:
 permissions: {}
 
 env:
-  GO_VERSION: "1.19.3"
-  SLSA_VERIFIER_VERSION: "2.0.0"
+  GO_VERSION: "1.21.4"
+  SLSA_VERIFIER_VERSION: "2.4.1"
   IMAGE_REF: "ghcr.io/${{ github.repository }}/calculator"
 
 jobs:
@@ -19,17 +19,17 @@ jobs:
       checks: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Setup Go
-        uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f # v3.3.1
+        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4.1.0
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Install go-junit-report
-        run: go install github.com/jstemmer/go-junit-report/v2@v2.0.0
+        run: go install github.com/jstemmer/go-junit-report/v2@v2.1.0
       - name: Run Unit Tests
         run: go test -v -timeout 60s -count=3 -race 2>&1 ./... | go-junit-report -set-exit-code > report.xml
       - name: Test Report
-        uses: dorny/test-reporter@c9b3d0e2bd2a4e96aaf424dbaa31c46b42318226 # v1.6.0
+        uses: dorny/test-reporter@afe6793191b75b608954023a46831a3fe10048d4 # v1.7.0
         if: always()
         with:
           name: 📋 Unit test report
@@ -42,15 +42,15 @@ jobs:
       calculator-hash: ${{ steps.calculator-hash.outputs.calculator-hash }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Setup Go
-        uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f # v3.3.1
+        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4.1.0
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Build Calculator
         run: |
           make build-cli
-      - uses: actions/upload-artifact@83fd05a356d7e2593de66fc9913b3002723633cb # v3.1.1
+      - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
         with:
           name: calculator
           path: calculator
@@ -68,23 +68,27 @@ jobs:
       - build-calculator
     steps:
       - name: Install Cosign & Rekor CLI
-        uses: sigstore/cosign-installer@9becc617647dfa20ae7b1151972e9b3a2c338a2b # v2.8.1
+        uses: sigstore/cosign-installer@1fc5bd396d372bee37d608f955b336615edf79c8 # v3.2.0
       - name: Download calculator binary
-        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: calculator
       - name: Sign calculator
         run: |
-          cosign sign-blob calculator --output-certificate calculator.pem --output-signature calculator.sig
+          cosign sign-blob calculator --output-certificate calculator.pem --output-signature calculator.sig -y
           # Verify - as documentation & sanity check
-          cosign verify-blob calculator --cert calculator.pem --signature calculator.sig
+          cosign verify-blob calculator \
+            --cert calculator.pem \
+            --signature calculator.sig \
+            --certificate-identity-regexp https://github.com/datosh-org/most-secure-calculator/.github/workflows/calculator.yml.* \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
         env:
           COSIGN_EXPERIMENTAL: 1
-      - uses: actions/upload-artifact@83fd05a356d7e2593de66fc9913b3002723633cb # v3.1.1
+      - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
         with:
           name: calculator.pem
           path: calculator.pem
-      - uses: actions/upload-artifact@83fd05a356d7e2593de66fc9913b3002723633cb # v3.1.1
+      - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
         with:
           name: calculator.sig
           path: calculator.sig
@@ -100,10 +104,10 @@ jobs:
       digest: ${{ steps.build-container-image.outputs.Digest }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Docker metadata
         id: meta
-        uses: docker/metadata-action@57396166ad8aefe6098280995947635806a0e6ea # v4.1.1
+        uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934 # v5.0.0
         with:
           images: |
             ${{ env.IMAGE_REF }}
@@ -116,18 +120,18 @@ jobs:
             type=ref,event=branch
       - name: Log in to ghcr.io
         id: docker-login
-        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a # v2.1.0
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Download calculator binary
-        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: calculator
       - name: Build and push container image
         id: build-container-image
-        uses: docker/build-push-action@c56af957549030174b10d6867f20e78cfd7debc5 # v3.2.0
+        uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09 # v5.0.0
         with:
           context: .
           file: cmd/calculator-cli/Dockerfile
@@ -144,20 +148,24 @@ jobs:
       id-token: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Install Cosign CLI
-        uses: sigstore/cosign-installer@9becc617647dfa20ae7b1151972e9b3a2c338a2b # v2.8.1
+        uses: sigstore/cosign-installer@1fc5bd396d372bee37d608f955b336615edf79c8 # v3.2.0
       - name: Log in to ghcr.io
         id: docker-login
-        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a # v2.1.0
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Sign calculator-image
         run: |
-          cosign sign -f ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }}
-          cosign verify ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }}
+          cosign sign -y \
+            ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }}
+          cosign verify \
+            --certificate-identity-regexp https://github.com/datosh-org/most-secure-calculator/.github/workflows/calculator.yml.* \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }}
         env:
           COSIGN_EXPERIMENTAL: 1
 
@@ -171,10 +179,10 @@ jobs:
       id-token: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Log in to ghcr.io
         id: docker-login
-        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a # v2.1.0
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -182,11 +190,17 @@ jobs:
       - name: Install syft & grype
         uses: ./.github/actions/install_syft_grype
         with:
-          syftVersion: "0.62.1"
-          grypeVersion: "0.53.1"
+          syftVersion: "0.97.0"
+          grypeVersion: "0.73.2"
+      - name: Install Cosign CLI
+        uses: sigstore/cosign-installer@1fc5bd396d372bee37d608f955b336615edf79c8 # v3.2.0
       - name: Generate and sign SBOM
         run: |
-          syft attest ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }} -o cyclonedx-json > calculator.att.json
+          syft -v -o cyclonedx-json ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }} > calculator.json
+          cosign attach sbom --sbom calculator.json ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }}
+
+          # broken, see: https://github.com/anchore/syft/issues/2333
+          # syft attest -o cyclonedx-json ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }} > calculator.att.json
       - name: Check for known vulnerabilities
         run: |
           grype ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }} --fail-on critical --only-fixed
@@ -198,7 +212,7 @@ jobs:
       id-token: write
     needs:
       - build-calculator
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.4.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.9.0
     with:
       base64-subjects: "${{ needs.build-calculator.outputs.calculator-hash }}"
 
@@ -209,11 +223,11 @@ jobs:
       - provenance
     steps:
       - name: Download calculator binary
-        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: calculator
       - name: Download provenance
-        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: ${{ needs.provenance.outputs.provenance-name }}
       - name: Install slsa-verifier
@@ -238,23 +252,23 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Download calculator binary
-        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: calculator
       - name: Download calculator certificate
-        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: calculator.pem
       - name: Download calculator signature
-        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: calculator.sig
       - name: Download provenance
-        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: ${{ needs.provenance.outputs.provenance-name }}
       - name: Release
-        uses: ncipollo/release-action@18eadf9c9b0f226f47f164f5373c6a44f0aae169 # v1.11.2
+        uses: ncipollo/release-action@6c75be85e571768fa31b40abf38de58ba0397db5 # v1.13.0
         with:
           draft: true
           artifacts: "calculator,calculator.pem,calculator.sig,calculator.intoto.jsonl"
