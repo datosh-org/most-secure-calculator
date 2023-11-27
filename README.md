@@ -251,3 +251,23 @@ We can then use cosign to download the SBOM and check it for vulnerabilities:
 IMG=$(make build-svc)
 cosign download sbom $IMG | grype --add-cpes-if-none --fail-on high
 ```
+
+## Sigstore Policy Controller
+
+```sh
+helm repo add sigstore https://sigstore.github.io/helm-charts
+helm repo update
+kubectl create namespace cosign-system
+helm install policy-controller -n cosign-system sigstore/policy-controller --devel
+kubectl get all -n cosign-system
+# Create namespace ...
+kubectl create namespace secured
+# ... and enforce signature policy
+# https://docs.sigstore.dev/policy-controller/overview/#configure-policy-controller-admission-controller-for-namespaces
+kubectl label namespace secured policy.sigstore.dev/include=true
+kubectl apply -f k8s/policy.yml
+# Appply deployment
+kubectl apply -f k8s/secure-deployment.yml
+
+curl localhost:80/secure-calculator/add/2/3
+```

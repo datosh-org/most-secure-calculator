@@ -1,7 +1,7 @@
 default: test
 
 PROJECTNAME=$(shell basename "$(PWD)")
-KIND_IMG=kindest/node:v1.25.3@sha256:f52781bc0d7a19fb6c405c2af83abfeb311f130707a0e219175677e366cc45d1
+KIND_IMG=kindest/node:v1.27.3@sha256:3966ac761ae0136263ffdb6cfd4db23ef8a83cba8a463690e98317add2c9ba72
 CONTAINER_REPO=ghcr.io/datosh-org/most-secure-calculator
 
 kind-up: kind-dep kind-create kind-deploy-nginx
