@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: calculator
-  namespace: default
+  namespace: secured
 spec:
   selector:
     matchLabels:
@@ -16,7 +16,7 @@ spec:
       containers:
         - name: calculator
           imagePullPolicy: IfNotPresent
-          image: ghcr.io/datosh-org/most-secure-calculator/calculator-svc
+          image: ghcr.io/datosh-org/most-secure-calculator/calculator@sha256:df7ab02ab1aeb3fb0049a5d0b45ff1fe6e604a8f0c4d91022d98f4eef9e51931
           ports:
             - containerPort: 8080
               name: http
@@ -32,7 +32,7 @@ kind: Service
 apiVersion: v1
 metadata:
   name: calculator
-  namespace: default
+  namespace: secured
 spec:
   selector:
     app: calculator
@@ -45,13 +45,13 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /$2
   name: ingress
-  namespace: default
+  namespace: secured
 spec:
   rules:
   - http:
       paths:
       - pathType: Prefix
-        path: /calculator(/|$)(.*)
+        path: /secure-calculator(/|$)(.*)
         backend:
           service:
             name: calculator
