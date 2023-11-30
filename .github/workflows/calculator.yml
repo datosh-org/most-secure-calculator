@@ -190,17 +190,13 @@ jobs:
       - name: Install syft & grype
         uses: ./.github/actions/install_syft_grype
         with:
-          syftVersion: "0.97.0"
-          grypeVersion: "0.73.2"
+          syftVersion: "0.98.0"
+          grypeVersion: "0.73.3"
       - name: Install Cosign CLI
         uses: sigstore/cosign-installer@1fc5bd396d372bee37d608f955b336615edf79c8 # v3.2.0
       - name: Generate and sign SBOM
         run: |
-          syft -v -o cyclonedx-json ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }} > calculator.json
-          cosign attach sbom --sbom calculator.json ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }}
-
-          # broken, see: https://github.com/anchore/syft/issues/2333
-          # syft attest -o cyclonedx-json ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }} > calculator.att.json
+          syft attest -o cyclonedx-json ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }} > calculator.att.json
       - name: Check for known vulnerabilities
         run: |
           grype ${{ env.IMAGE_REF }}@${{ needs.build-calculator-image.outputs.digest }} --fail-on critical --only-fixed
