@@ -224,6 +224,116 @@ Among other features it allows you to set permissions for repository branches, t
 
 At the same time, [gittuf v0.1.0 was release in October 2023](https://github.com/gittuf/gittuf/releases/tag/v0.1.0), is currently in alpha and therefore NOT intended for production use.
 
+## Vulnerability Management
+
+Software Bill of Materials (SBOMs) are becoming the standard tool to keep track of all ingredients of your artifact.
+
+In case of container images, the artifact is not only made up of the executable itself, but also any additional components available in the image. Some of these components might be required (dynamically linked libraries, helper tools), but others can include any not cleaned-up build dependencies (compilers, linters, unit test frameworks) or also debug tools (shell, networking tools, editors). All of these additional components provide attackers with options to fall back onto during an attack.
+
+Of course we should also strive to keep our images as small as possible, but the next best thing is to know about all the components, their versions and any known vulnerabilities.
+
+### Generate an SBOM
+
+[Syft](https://github.com/anchore/syft) is an open source tool to generate a Software Bill of Materials (SBOM) from container images and filesystems.
+
+<details>
+  <summary>Installation script</summary>
+
+  ```sh
+  # https://github.com/anchore/syft/releases
+  SYFT_VERSION=0.98.0
+  cd $(mktemp -d)
+  curl -LO https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz
+  tar -xzf syft_${SYFT_VERSION}_linux_amd64.tar.gz
+  sudo install syft /usr/local/bin
+  rm syft_${SYFT_VERSION}_linux_amd64.tar.gz
+  cd -
+  syft version
+  ```
+</details>
+
+We can easily generate an SBOM for any container images:
+
+```sh
+# table to stdout
+syft httpd:2.4.58
+# spdx format: https://spdx.dev/
+syft httpd:2.4.58 -o spdx-json=spdx.json
+# cyclonedx format: https://cyclonedx.org/
+syft httpd:2.4.58 -o cyclonedx-json=cyclone.json
+```
+
+### Grype
+
+[Grype](https://github.com/anchore/grype) is an open source vulnerability scanner that can directly work on SBOMs.
+
+<details>
+  <summary>Installation script</summary>
+
+  ```sh
+  # https://github.com/anchore/grype/releases
+  GRYPE_VERSION=0.73.3
+  cd $(mktemp -d)
+  curl -LO https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_linux_amd64.tar.gz
+  tar -xzf grype_${GRYPE_VERSION}_linux_amd64.tar.gz
+  sudo install grype /usr/local/bin
+  rm grype_${GRYPE_VERSION}_linux_amd64.tar.gz
+  cd -
+  grype version
+  ```
+</details>
+
+We use the SBOM generated in the previous step to scan for known vulnerabilities:
+
+```sh
+grype spdx.json
+# exit code is 0, even though we have findings.
+echo $?
+# fail, if there are findings >= threshold.
+grype spdx.json --fail-on critical
+echo $?
+# ignore things without a fix.
+grype spdx.json --fail-on critical --only-fixed
+```
+
+Grype also offers the option to persist a configuration directly in the repository:
+
+```yaml
+external-sources:
+  enable: true
+  maven:
+    search-upstream-by-sha1: true
+    base-url: https://search.maven.org/solrsearch/select
+```
+
+This can also help you to track the state of vulnerabilities directly with your source code:
+
+```yaml
+ignore:
+  # This is the full set of supported rule fields:
+  - vulnerability: CVE-2008-4318
+    fix-state: unknown
+    # VEX fields apply when Grype reads vex data:
+    vex-status: not_affected
+    vex-justification: vulnerable_code_not_present
+    package:
+      name: libcurl
+      version: 1.5.1
+      type: npm
+      location: "/usr/local/lib/node_modules/**"
+
+  # We can make rules to match just by vulnerability ID:
+  - vulnerability: CVE-2014-54321
+```
+
+### Integrity & Discoverability
+
+
+
+### Vulnerability Exploitability eXchange (VEX)
+
+[VEX](https://cyclonedx.org/capabilities/vex/) ...
+
 ## Ko & KinD
 
 We use [ko](https://ko.build/install/) and [KinD](https://kind.sigs.k8s.io/docs/user/quick-start/) for a local development environment. Follow their quick start and installation guides for your system.
@@ -235,10 +345,6 @@ make kind-up
 make deploy
 curl localhost/calculator/add/2/33
 ```
-
-## Grype
-
-Download and install [sigstore/cosign](https://github.com/sigstore/cosign) and [anchore/grype](https://github.com/anchore/grype).
 
 When we build our Go service with `ko` multiple things happen:
 * A container image is produced and uploaded to `ghcr.io`
