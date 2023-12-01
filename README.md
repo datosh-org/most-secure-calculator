@@ -328,37 +328,28 @@ ignore:
 
 ### Integrity & Discoverability
 
+```sh
+syft attest --output spdx-json ghcr.io/datosh-org/most-secure-calculator/calculator-svc:please-sign-me
 
+cosign verify-attestation \
+  ghcr.io/datosh-org/most-secure-calculator/calculator-svc:please-sign-me \
+  --certificate-identity=datosh18@gmail.com \
+  --certificate-oidc-issuer=https://github.com/login/oauth \
+  --type=spdxjson > spdx.json
+
+# make sure there is only a single attestation associated.
+wc -l spdx.json
+
+cat spdx.json | jq -r '.payload | @base64d | fromjson | .predicate' | grype
+```
 
 ### Vulnerability Exploitability eXchange (VEX)
 
-[VEX](https://cyclonedx.org/capabilities/vex/) ...
+[VEX](https://cyclonedx.org/capabilities/vex/) ... to-do...
 
-## Ko & KinD
+## Container Signing
 
-We use [ko](https://ko.build/install/) and [KinD](https://kind.sigs.k8s.io/docs/user/quick-start/) for a local development environment. Follow their quick start and installation guides for your system.
-
-Afterwards use the [Makefile](Makefile) to spin up a KinD cluster, build and deploy our service, and consume its API:
-
-```sh
-make kind-up
-make deploy
-curl localhost/calculator/add/2/33
-```
-
-When we build our Go service with `ko` multiple things happen:
-* A container image is produced and uploaded to `ghcr.io`
-* An SBOM is produced and uploaded to `ghcr.io`
-* The SHA reference to our container image is returned
-
-We can then use cosign to download the SBOM and check it for vulnerabilities:
-
-```sh
-IMG=$(make build-svc)
-cosign download sbom $IMG | grype --add-cpes-if-none --fail-on high
-```
-
-## Sigstore Policy Controller
+### Sigstore Policy Controller
 
 ```sh
 helm repo add sigstore https://sigstore.github.io/helm-charts
