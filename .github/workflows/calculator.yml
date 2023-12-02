@@ -91,6 +91,7 @@ jobs:
           name: calculator.sig
           path: calculator.sig
 
+  # TODO: refactor container image related activities into own workflow.
   build-calculator-image:
     runs-on: ubuntu-22.04
     permissions:

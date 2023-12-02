@@ -5,7 +5,7 @@ CLI & backend service can be implemented on GitHub using GitHub Actions.
 
 It features security best practices such as:
 * Git commit signing ([gitsign](https://github.com/sigstore/gitsign)) and verification ([chaingurad/enforce](https://github.com/apps/chainguard-enforce)).
-* SBOM generation ([anchore/syft](https://github.com/anchore/syft)) and vulnerability scanning ([anchore/grype](https://github.com/anchore/grype))
+* Integrity protected SBOM generation ([anchore/syft](https://github.com/anchore/syft)) and vulnerability scanning ([anchore/grype](https://github.com/anchore/grype)) on a verified SBOM.
 * SLSA provenance generation ([slsa-framework/slsa-github-generator](https://github.com/slsa-framework/slsa-github-generator)) and verification ([slsa-framework/slsa-verifier](https://github.com/slsa-framework/slsa-verifier)).
 
 This will protect us from different [threats in our software supply chain](https://slsa.dev/spec/v1.0/threats-overview).
@@ -216,7 +216,7 @@ spec:
 
 Additional we can [configure](https://github.com/datosh-org/most-secure-calculator/settings/branch_protection_rules/31734554) a merge-blocking check to prevent any unsigned commits making it to `main`.
 
-### gittuf
+### Outlook: gittuf
 
 [gittuf/gittuf](https://github.com/gittuf/gittuf) provides a security layer for Git.
 
@@ -224,7 +224,69 @@ Among other features it allows you to set permissions for repository branches, t
 
 At the same time, [gittuf v0.1.0 was release in October 2023](https://github.com/gittuf/gittuf/releases/tag/v0.1.0), is currently in alpha and therefore NOT intended for production use.
 
-## Vulnerability Management
+## Build the service
+
+The [Dockerfile](cmd/calculator-svc/Dockerfile) for the backend service uses a multi-stage build to:
+1. containerize the build stage
+2. keep the final production image as small as possible
+
+```sh
+make build-svc-oci
+```
+
+Alternatively, we can also build the service using a local Go toolchain:
+
+```sh
+make build-svc
+```
+
+### Sign container image
+
+To protect the container image from malicious tampering, we want to sign it:
+
+```sh
+# Note that this process stored public information in the transparency log.
+cosign sign calculator-svc
+# Verify locally signed image
+cosign verify \
+  --certificate-identity datosh18@gmail.com \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  calculator-svc
+
+# Verify images signed by the pipeline
+cosign verify \
+  --certificate-identity-regexp https://github.com/datosh-org/most-secure-calculator/.github/workflows/calculator.yml.* \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/datosh-org/most-secure-calculator/calculator-svc@sha256:b2d2de552850cc7f99ebf0d0071357306159242ccf720b5b001ab694220f9547
+```
+
+TODO: add reference to issue discuss sign before push.
+
+### Sigstore Kubernetes Policy Controller
+
+A lot of our deployments will regularly pull from the registry and verification should happend automatically. For this we can use projects such as [Sigstore Kubernetes Policy Controller](https://docs.sigstore.dev/policy-controller/overview/)
+
+TODO: re-test this.
+
+```sh
+helm repo add sigstore https://sigstore.github.io/helm-charts
+helm repo update
+kubectl create namespace cosign-system
+helm install policy-controller -n cosign-system sigstore/policy-controller --devel
+kubectl get all -n cosign-system
+# Create namespace ...
+kubectl create namespace secured
+# ... and enforce signature policy
+# https://docs.sigstore.dev/policy-controller/overview/#configure-policy-controller-admission-controller-for-namespaces
+kubectl label namespace secured policy.sigstore.dev/include=true
+kubectl apply -f k8s/policy.yml
+# Appply deployment
+kubectl apply -f k8s/secure-deployment.yml
+
+curl localhost:80/secure-calculator/add/2/3
+```
+
+### Vulnerability Management
 
 Software Bill of Materials (SBOMs) are becoming the standard tool to keep track of all ingredients of your artifact.
 
@@ -343,28 +405,59 @@ wc -l spdx.json
 cat spdx.json | jq -r '.payload | @base64d | fromjson | .predicate' | grype
 ```
 
-### Vulnerability Exploitability eXchange (VEX)
+### Outlook: Vulnerability Exploitability eXchange (VEX)
 
-[VEX](https://cyclonedx.org/capabilities/vex/) ... to-do...
+TODO: Write a few lines about the problems VEX is solving.
 
-## Container Signing
+[VEX](https://cyclonedx.org/capabilities/vex/)
 
-### Sigstore Policy Controller
+## Build CLI
+
+OCI compatibel artifacts can be distributed via a breadth of registries. On the other hand, CLI binaries are usually distributed via GitHub releases page of a repository.
+
+### Provenance
+
+Provenance is [the verifiable information about software artifacts describing where, when and how something was produced](https://slsa.dev/spec/v1.0/provenance). It records information such as:
+* a reference to the input source code
+* information about the build environment
+* output of the build, which can include files distinct from the actual binary
+
+![](https://slsa.dev/spec/v1.0/images/provenance-model.svg)
+
+In contrast, classical software signatures only prove that the distributed artifact and the cryptographic private key have been at the same place at the same time.
+
+### SLSA-GitHub-Generator
+
+[SLSA-GitHub-Generator](https://github.com/slsa-framework/slsa-github-generator) is a project that [contains free tools to generate and verify SLSA Build Level 3 provenance for native GitHub projects using GitHub Actions](https://github.com/slsa-framework/slsa-github-generator#overview).
+
+Furthermore, [it can help you achieve SLSA Build level 3, use of the provided GitHub Actions reusable workflows alone is not sufficient to meet all of the requirements at SLSA Build level 3. Specifically, these workflows do not address provenance distribution or verification.](https://github.com/slsa-framework/slsa-github-generator#what-is-slsa-github-generator)
+
+For the pipeline implementation refer to [workflows/calculator.yml](.github/workflows/calculator.yml).
+
+### SLSA-Verifier
+
+Once a release was generated we can use [SLSA-Verifier](https://github.com/slsa-framework/slsa-verifier) to verify both the cryptographic signature, as well as contents of the provenance document, before consuming the binary.
 
 ```sh
-helm repo add sigstore https://sigstore.github.io/helm-charts
-helm repo update
-kubectl create namespace cosign-system
-helm install policy-controller -n cosign-system sigstore/policy-controller --devel
-kubectl get all -n cosign-system
-# Create namespace ...
-kubectl create namespace secured
-# ... and enforce signature policy
-# https://docs.sigstore.dev/policy-controller/overview/#configure-policy-controller-admission-controller-for-namespaces
-kubectl label namespace secured policy.sigstore.dev/include=true
-kubectl apply -f k8s/policy.yml
-# Appply deployment
-kubectl apply -f k8s/secure-deployment.yml
+# TODO: curl the required artifacts from release page
 
-curl localhost:80/secure-calculator/add/2/3
+slsa-verifier verify-artifact calculator \
+  --provenance-path calculator.intoto.jsonl \
+  --source-uri github.com/datosh-org/most-secure-calculator \
+  --source-tag v0.1.0
+slsa-verifier verify-artifact calculator.sbom \
+  --provenance-path calculator.intoto.jsonl \
+  --source-uri github.com/datosh-org/most-secure-calculator \
+  --source-tag v0.1.0
+
+grype calculator.sbom
+./calculator 2 3
 ```
+
+## References
+
+### FRSCA
+
+TODO: Explain why is FRSCA interesting in this context...?
+
+[Factory for Repeatable Secure Creation of Artifacts](https://buildsec.github.io/frsca/).
