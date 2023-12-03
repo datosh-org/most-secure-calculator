@@ -1,11 +1,11 @@
 # Most Secure Calculator
 
 This repository demonstrates how security best practices for a [Go](https://go.dev/)
-CLI & backend service can be implemented on GitHub using GitHub Actions.
+CLI application & backend service can be implemented on GitHub using GitHub Actions.
 
 It features security best practices such as:
 * Git commit signing ([gitsign](https://github.com/sigstore/gitsign)) and verification ([chaingurad/enforce](https://github.com/apps/chainguard-enforce)).
-* Integrity protected SBOM generation ([anchore/syft](https://github.com/anchore/syft)) and vulnerability scanning ([anchore/grype](https://github.com/anchore/grype)) on a verified SBOM.
+* Integrity protected SBOM generation ([anchore/syft](https://github.com/anchore/syft)) and vulnerability scanning ([anchore/grype](https://github.com/anchore/grype)) with a verified SBOM.
 * SLSA provenance generation ([slsa-framework/slsa-github-generator](https://github.com/slsa-framework/slsa-github-generator)) and verification ([slsa-framework/slsa-verifier](https://github.com/slsa-framework/slsa-verifier)).
 
 This will protect us from different [threats in our software supply chain](https://slsa.dev/spec/v1.0/threats-overview).
@@ -102,14 +102,15 @@ git commit signing is supported, since [git v1.7.9 (January 2012)](https://githu
 
 ### Key management and revocation
 
-So why isn't everyone signing using GPG?
+So why isn't everyone signing their git commits using GPG?
 
-GPG based keys come with a set of trade-offs. They do provide a very high level of security,
+GPG based keys come with a set of trade-offs. They do provide a very high level
+of security (given that no other service providers need to be trusted),
 if all users have secure processes in place to answer the following questions:
 
-* How do I store my master-key and sub-keys?
-* How do I make it available on all my machines?
-* How do I renew my key when it expires?
+* How do I securely store my master-key and sub-keys?
+* How do I make the right keys available on all my machines?
+* How do I renew my keys when they expire?
 * How do I revoke my key when it leaks?
 * Which keys do I trust?
 
@@ -118,7 +119,7 @@ if all users have secure processes in place to answer the following questions:
 We can improve the UX significantly by placing some trust in an identity provider, which we (probably) do already.
 
 [Sigstore](https://www.sigstore.dev/) enables us to:
-1. Generate a key and short lived certificate that is bound to an [OpenID Connect](https://openid.net/developers/how-connect-works/) identity.
+1. Generate a key and short-lived certificate that is bound to an [OpenID Connect](https://openid.net/developers/how-connect-works/) identity.
 1. Generate proof that we own this key at a specific point in time.
 1. Store the proof in an immutable transparency log for later verification.
 
@@ -171,7 +172,9 @@ Verify & inspect:
 # Using git (partial verification)
 git verify-commit HEAD
 # Using gitsign
-gitsign verify --certificate-identity=datosh18@gmail.com --certificate-oidc-issuer=https://github.com/login/oauth
+gitsign verify \
+  --certificate-identity=datosh18@gmail.com \
+  --certificate-oidc-issuer=https://github.com/login/oauth
 # Show actual signature value
 git log --pretty=raw
 # Show (partial) signature validation
@@ -194,7 +197,30 @@ git log --show-signature
 </details>
 
 > [!NOTE]
-> [GitHub does not recognize gitsign signatures as verified at the moment](https://github.com/sigstore/gitsign#why-doesnt-github-show-commits-as-verified)
+> [GitHub does not recognize gitsign signatures as verified at the moment](https://github.com/sigstore/gitsign#why-doesnt-github-show-commits-as-verified).
+
+<details>
+  <summary>Configure gitsign credential cache</summary>
+
+  When doing multiple git commits in a short period of time, it might become
+  annoying to do the OIDC dance for every commit.
+
+  The gitsign credential cache binary enables users to re-use the key during
+  its 10 minutes lifetime.
+
+  Check the [official documentation](https://github.com/sigstore/gitsign/blob/main/cmd/gitsign-credential-cache/README.md)
+  as the configuration is highly platform dependent.
+
+  ```sh
+  gitsign-credential-cache &
+  export GITSIGN_CREDENTIAL_CACHE="$HOME/.cache/sigstore/gitsign/cache.sock"
+  ```
+
+  > [!WARNING]
+  > Users should consider that caching the key [introduces a security risk](https://github.com/sigstore/gitsign/blob/main/cmd/gitsign-credential-cache/README.md), as
+  > the key is exposed via unix sockets.
+
+</details>
 
 ### chainguard-enforce
 
@@ -255,18 +281,57 @@ cosign verify \
 
 # Verify images signed by the pipeline
 cosign verify \
-  --certificate-identity-regexp https://github.com/datosh-org/most-secure-calculator/.github/workflows/calculator.yml.* \
+  --certificate-identity-regexp https://github.com/datosh-org/most-secure-calculator/.github/workflows/calculator-svc.yml.* \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   ghcr.io/datosh-org/most-secure-calculator/calculator-svc@sha256:b2d2de552850cc7f99ebf0d0071357306159242ccf720b5b001ab694220f9547
 ```
 
-TODO: add reference to issue discuss sign before push.
+> [!WARNING]
+> Depending on how the image was build and pushed, there are still risks to
+> consider, as you might only know the digest of the image, **after** it was
+> pushed to the registry. [sigstore/cosign#2516](https://github.com/sigstore/cosign/issues/2516)
 
 ### Sigstore Kubernetes Policy Controller
 
-A lot of our deployments will regularly pull from the registry and verification should happend automatically. For this we can use projects such as [Sigstore Kubernetes Policy Controller](https://docs.sigstore.dev/policy-controller/overview/)
+K8s deployments will regularly require to pull images from the registry and
+make them available on the node. As this is an automatic process, the
+verification should also happen automatically. For this, we can use projects
+such as [Sigstore Kubernetes Policy Controller](https://docs.sigstore.dev/policy-controller/overview/).
 
-TODO: re-test this.
+<details>
+  <summary>Local Kubernetes in Docker (kind) cluster</summary>
+
+  The Sigstore Kubernetes policy controller works with any K8s derivate.
+  To test it on a local developer machine projects such as
+  [minikube](https://minikube.sigs.k8s.io/docs/start/),
+  [microk8s](https://microk8s.io/) or
+  [kind](https://github.com/kubernetes-sigs/kind)
+  work great. Here we show how to stand up a local K8s cluster with kind:
+
+  ```sh
+  KIND_VERSION=0.20.0
+  cd $(mktemp -d)
+  curl -LO https://github.com/kubernetes-sigs/kind/releases/download/v{KIND_VERSION}/kind-linux-amd64
+  sudo install kind-linux-amd64 /usr/local/bin/kind
+  rm kind-linux-amd64
+  cd -
+  ```
+
+  We use a simple single-node [kind configuration](kind/kind-config.yml) and
+  additionally deploy [nginx as a loadblancer](kind/nginx.yml).
+
+  ```sh
+  make kind-up
+  ```
+</details>
+
+Install calculator service with no verification:
+
+```sh
+kubectl apply -f k8s/deployment.yml
+curl localhost:80/calculator/add/2/3
+```
+Install the Sigstore Kubernetes Policy Controller:
 
 ```sh
 helm repo add sigstore https://sigstore.github.io/helm-charts
@@ -274,29 +339,28 @@ helm repo update
 kubectl create namespace cosign-system
 helm install policy-controller -n cosign-system sigstore/policy-controller --devel
 kubectl get all -n cosign-system
-# Create namespace ...
+```
+
+Create a namespace, enforce the policy and deploy:
+
+```sh
 kubectl create namespace secured
-# ... and enforce signature policy
 # https://docs.sigstore.dev/policy-controller/overview/#configure-policy-controller-admission-controller-for-namespaces
 kubectl label namespace secured policy.sigstore.dev/include=true
 kubectl apply -f k8s/policy.yml
-# Appply deployment
 kubectl apply -f k8s/secure-deployment.yml
-
 curl localhost:80/secure-calculator/add/2/3
 ```
 
 ### Vulnerability Management
 
-Software Bill of Materials (SBOMs) are becoming the standard tool to keep track of all ingredients of your artifact.
-
-In case of container images, the artifact is not only made up of the executable itself, but also any additional components available in the image. Some of these components might be required (dynamically linked libraries, helper tools), but others can include any not cleaned-up build dependencies (compilers, linters, unit test frameworks) or also debug tools (shell, networking tools, editors). All of these additional components provide attackers with options to fall back onto during an attack.
-
-Of course we should also strive to keep our images as small as possible, but the next best thing is to know about all the components, their versions and any known vulnerabilities.
+Software Bill of Materials (SBOMs) are becoming the standard tool
+to keep track of all ingredients in your artifacts.
 
 ### Generate an SBOM
 
-[Syft](https://github.com/anchore/syft) is an open source tool to generate a Software Bill of Materials (SBOM) from container images and filesystems.
+[Syft](https://github.com/anchore/syft) is an open source tool to generate
+a Software Bill of Materials (SBOM) from container images and filesystems.
 
 <details>
   <summary>Installation script</summary>
@@ -325,9 +389,14 @@ syft httpd:2.4.58 -o spdx-json=spdx.json
 syft httpd:2.4.58 -o cyclonedx-json=cyclone.json
 ```
 
+Generating a list of these ingredients as a distinct build artifact allows us
+to keep the responsibilities of vulnerability management and application
+deployment seperate.
+
 ### Grype
 
-[Grype](https://github.com/anchore/grype) is an open source vulnerability scanner that can directly work on SBOMs.
+[Grype](https://github.com/anchore/grype) is an open source vulnerability
+scanner that can directly work on SBOMs.
 
 <details>
   <summary>Installation script</summary>
@@ -390,9 +459,27 @@ ignore:
 
 ### Integrity & Discoverability
 
-```sh
-syft attest --output spdx-json ghcr.io/datosh-org/most-secure-calculator/calculator-svc:please-sign-me
+As with our applications, we also want to protect our SBOMs from manipulations.
 
+Attackers could:
+* remove entries, to prevent us from patching vulnerabilities
+* add entries, to harm the reputation of a project
+
+Therefore, we use the same concepts to also sign our SBOM:
+
+> [!WARNING]
+> Make sure to install syft>=v0.98.0, as `syft attest`
+> [was broken before](https://github.com/anchore/syft/issues/2333).
+
+```sh
+syft attest --output spdx-json \
+  ghcr.io/datosh-org/most-secure-calculator/calculator-svc:please-sign-me
+```
+
+This attestation statement and SBOM is stored in the same OCI registry as our
+container image, and makes discoverability straight forward:
+
+```sh
 cosign verify-attestation \
   ghcr.io/datosh-org/most-secure-calculator/calculator-svc:please-sign-me \
   --certificate-identity=datosh18@gmail.com \
@@ -402,6 +489,7 @@ cosign verify-attestation \
 # make sure there is only a single attestation associated.
 wc -l spdx.json
 
+# Extract SBOM from attestation
 cat spdx.json | jq -r '.payload | @base64d | fromjson | .predicate' | grype
 ```
 
@@ -413,7 +501,9 @@ TODO: Write a few lines about the problems VEX is solving.
 
 ## Build CLI
 
-OCI compatibel artifacts can be distributed via a breadth of registries. On the other hand, CLI binaries are usually distributed via GitHub releases page of a repository.
+OCI compatibel artifacts can be distributed via a breadth of registries.
+On the other hand, CLI binaries are usually distributed via GitHub release
+pages.
 
 ### Provenance
 
@@ -424,7 +514,9 @@ Provenance is [the verifiable information about software artifacts describing wh
 
 ![](https://slsa.dev/spec/v1.0/images/provenance-model.svg)
 
-In contrast, classical software signatures only prove that the distributed artifact and the cryptographic private key have been at the same place at the same time.
+In contrast, classical software signatures only prove that the distributed
+artifact and the cryptographic private key have been at the same place at the
+same time.
 
 ### SLSA-GitHub-Generator
 
@@ -432,7 +524,7 @@ In contrast, classical software signatures only prove that the distributed artif
 
 Furthermore, [it can help you achieve SLSA Build level 3, use of the provided GitHub Actions reusable workflows alone is not sufficient to meet all of the requirements at SLSA Build level 3. Specifically, these workflows do not address provenance distribution or verification.](https://github.com/slsa-framework/slsa-github-generator#what-is-slsa-github-generator)
 
-For the pipeline implementation refer to [workflows/calculator.yml](.github/workflows/calculator.yml).
+For the pipeline implementation refer to [workflows/calculator-svc.yml](.github/workflows/calculator-svc.yml).
 
 ### SLSA-Verifier
 
@@ -454,10 +546,12 @@ grype calculator.sbom
 ./calculator 2 3
 ```
 
-## References
+## Related Projects
 
 ### FRSCA
 
-TODO: Explain why is FRSCA interesting in this context...?
-
 [Factory for Repeatable Secure Creation of Artifacts](https://buildsec.github.io/frsca/).
+
+### Trusty & Minder
+
+[Announcing Minder and Trusty: Free-to-use tools to help developers and open source communities build safer software](https://stacklok.com/blog/announcing-trusty-and-minder-free-to-use-tools-to-help-developers-and-open-source-communities-build-safer-software)

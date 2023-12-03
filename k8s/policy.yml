@@ -11,6 +11,6 @@ spec:
       url: "https://fulcio.sigstore.dev"
       identities:
         - issuer: https://token.actions.githubusercontent.com
-          subject: "https://github.com/datosh-org/most-secure-calculator/.github/workflows/calculator.yml@refs/heads/main"
+          subject: "https://github.com/datosh-org/most-secure-calculator/.github/workflows/calculator-svc.yml@refs/heads/main"
     ctlog:
       url: https://rekor.sigstore.dev

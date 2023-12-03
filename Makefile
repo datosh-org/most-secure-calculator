@@ -35,19 +35,20 @@ test:
 	@go test -v -timeout 60s -race ./...
 
 
-kind-up: kind-dep kind-create kind-deploy-nginx
+kind-up: kind-pull kind-create kind-deploy-nginx
 
-kind-dep:
+kind-pull:
 	@docker pull ${KIND_IMG}
 
 kind-create:
-	@kind create cluster --image=${IMG} --config=kind/kind-config.yml
+	@kind create cluster \
+		--image=${KIND_IMG} \
+		--config=kind/kind-config.yml \
+		--kubeconfig=kubeconfig.yml
+	@export KUBECONFIG="kubeconfig.yml"
 
 kind-deploy-nginx:
 	@kubectl apply -f kind/nginx.yml
-	@sleep 30
-	@kubectl -n ingress-nginx delete pods -l app.kubernetes.io/component=controller
-	@kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=120s
 
 kind-down:
 	@kind delete cluster
