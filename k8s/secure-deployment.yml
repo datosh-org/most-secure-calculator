@@ -16,6 +16,7 @@ spec:
       containers:
         - name: calculator
           imagePullPolicy: IfNotPresent
+          # TODO: update image, this ones binary can't be executed (permission error)
           image: ghcr.io/datosh-org/most-secure-calculator/calculator@sha256:df7ab02ab1aeb3fb0049a5d0b45ff1fe6e604a8f0c4d91022d98f4eef9e51931
           ports:
             - containerPort: 8080
