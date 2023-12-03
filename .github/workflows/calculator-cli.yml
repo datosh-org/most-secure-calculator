@@ -84,14 +84,6 @@ jobs:
         uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: calculator
-      - name: Download calculator certificate
-        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
-        with:
-          name: calculator.pem
-      - name: Download calculator signature
-        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
-        with:
-          name: calculator.sig
       - name: Download provenance
         uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
@@ -100,4 +92,4 @@ jobs:
         uses: ncipollo/release-action@6c75be85e571768fa31b40abf38de58ba0397db5 # v1.13.0
         with:
           draft: true
-          artifacts: "calculator,calculator.pem,calculator.sig,calculator.intoto.jsonl"
+          artifacts: "calculator,calculator.intoto.jsonl"
