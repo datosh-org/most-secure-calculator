@@ -531,7 +531,9 @@ For the pipeline implementation refer to [workflows/calculator-svc.yml](.github/
 Once a release was generated we can use [SLSA-Verifier](https://github.com/slsa-framework/slsa-verifier) to verify both the cryptographic signature, as well as contents of the provenance document, before consuming the binary.
 
 ```sh
-# TODO: curl the required artifacts from release page
+curl -LO https://github.com/datosh-org/most-secure-calculator/releases/download/v0.1.0/calculator
+curl -LO https://github.com/datosh-org/most-secure-calculator/releases/download/v0.1.0/calculator.sbom
+curl -LO https://github.com/datosh-org/most-secure-calculator/releases/download/v0.1.0/calculator.intoto.jsonl
 
 slsa-verifier verify-artifact calculator \
   --provenance-path calculator.intoto.jsonl \
