@@ -16,7 +16,7 @@ spec:
       containers:
         - name: calculator
           imagePullPolicy: IfNotPresent
-          image: ghcr.io/datosh-org/most-secure-calculator/calculator-svc
+          image: ghcr.io/datosh-org/most-secure-calculator/calculator-svc:v0.1.0
           ports:
             - containerPort: 8080
               name: http
