@@ -271,7 +271,7 @@ make build-svc
 To protect the container image from malicious tampering, we want to sign it:
 
 ```sh
-# Note that this process stored public information in the transparency log.
+# Note that this process stores public information in the transparency log.
 cosign sign calculator-svc
 # Verify locally signed image
 cosign verify \
@@ -524,7 +524,7 @@ same time.
 
 Furthermore, [it can help you achieve SLSA Build level 3, use of the provided GitHub Actions reusable workflows alone is not sufficient to meet all of the requirements at SLSA Build level 3. Specifically, these workflows do not address provenance distribution or verification.](https://github.com/slsa-framework/slsa-github-generator#what-is-slsa-github-generator)
 
-For the pipeline implementation refer to [workflows/calculator-svc.yml](.github/workflows/calculator-svc.yml).
+For the pipeline implementation refer to [workflows/calculator-cli.yml](.github/workflows/calculator-cli.yml).
 
 ### SLSA-Verifier
 
