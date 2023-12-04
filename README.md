@@ -532,19 +532,20 @@ Once a release was generated we can use [SLSA-Verifier](https://github.com/slsa-
 
 ```sh
 curl -LO https://github.com/datosh-org/most-secure-calculator/releases/download/v0.1.0/calculator
-curl -LO https://github.com/datosh-org/most-secure-calculator/releases/download/v0.1.0/calculator.sbom
+curl -LO https://github.com/datosh-org/most-secure-calculator/releases/download/v0.1.0/calculator.spdx.json
 curl -LO https://github.com/datosh-org/most-secure-calculator/releases/download/v0.1.0/calculator.intoto.jsonl
 
 slsa-verifier verify-artifact calculator \
   --provenance-path calculator.intoto.jsonl \
   --source-uri github.com/datosh-org/most-secure-calculator \
   --source-tag v0.1.0
-slsa-verifier verify-artifact calculator.sbom \
+slsa-verifier verify-artifact calculator.spdx.json \
   --provenance-path calculator.intoto.jsonl \
   --source-uri github.com/datosh-org/most-secure-calculator \
   --source-tag v0.1.0
 
-grype calculator.sbom
+grype calculator.spdx.json
+chmod u+x calculator
 ./calculator 2 3
 ```
 
