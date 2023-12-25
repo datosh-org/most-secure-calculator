@@ -501,7 +501,7 @@ TODO: Write a few lines about the problems VEX is solving.
 
 ## Build CLI
 
-OCI compatibel artifacts can be distributed via a breadth of registries.
+OCI compatible artifacts can be distributed via a breadth of registries.
 On the other hand, CLI binaries are usually distributed via GitHub release
 pages.
 
