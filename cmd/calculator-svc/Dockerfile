@@ -13,6 +13,6 @@ RUN CGO_ENABLED=0 go build \
     -o calculator-svc ./cmd/calculator-svc/
 
 # gcr.io/distroless/static includes certificates necessary for TLS.
-FROM gcr.io/distroless/static@sha256:d49f214e6f1bae819e24f651156552b073725592cae128a66eade0c6280f02e1 as release
+FROM gcr.io/distroless/static@sha256:30c679764948df7b86cfb4a09f8f5baf6243849fe96cd97ea700f8319803e941 as release
 COPY --chmod=755 --from=build /app/calculator-svc /
 ENTRYPOINT [ "/calculator-svc" ]
